@@ -84,7 +84,6 @@ function createLinks(links) {
 }
 
 function createNodes(nodes,queries) {
-  nodes.exit.remove()
   var n = svg.selectAll(".node")
      .data(nodes)
      .enter().append("circle");
