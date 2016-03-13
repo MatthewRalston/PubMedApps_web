@@ -25,3 +25,4 @@ config/secrets.yml
 Gemfile.lock
 
 .ruby-gemset
+.DS_Store

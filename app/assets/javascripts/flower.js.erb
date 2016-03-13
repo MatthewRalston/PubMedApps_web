@@ -1,120 +1,184 @@
 var test;
 
 function rendering() {
-    pubmed_url_base = "http://www.ncbi.nlm.nih.gov/pubmed/"
-    height = 500;
-    // var color = d3.scale.category20();
-    lengthmultiplier = 200;
-    radius = 7;
+  pubmed_url_base = "http://www.ncbi.nlm.nih.gov/pubmed/"
+  height = 500;
+  // var color = d3.scale.category20();
+  lengthmultiplier = 200;
+  radius = 7;
 
 
-    width = document.getElementById("flowersvg").clientWidth;
-    svg = d3.select("body #flowersvg")
-	.append("div").append("svg").attr("width",width).attr("height",height);
-    
-    force = d3.layout.force()
-	.charge(-120)
-	.gravity(0.1)
-	.linkDistance(function(d){ return (1 - d.value)*lengthmultiplier;})
-	.size([width,height])
+  width = document.getElementById("flowersvg").clientWidth;
+  svg = d3.select("body #flowersvg")
+	  .append("div").append("svg").attr("width",width).attr("height",height);
 
-    force
-	.nodes(jsondata.nodes)
-	.links(jsondata.links)
-	.start();
+  nodes = jsondata.nodes;
+  links = jsondata.links;
+  newdata = [];
+  force = d3.layout.force()
+		   .nodes(nodes)
+		   .links(links)
+		   .charge(-120)
+		   .gravity(0.1)
+		   .linkDistance(function(d){ return (1 - d.value)*lengthmultiplier;})
+		   .size([width,height])
 
-    link = createLinks(jsondata.links);
-    queries = [jsondata.nodes[0]];
-    node = createNodes(jsondata.nodes,queries);
-    node.on("mouseover",function(d){
-      force.stop();
-	  d3.selectAll(".related")
-	    .transition()
-	    .attr("r",radius);
 
-	    selected = d3.select(this);
-	  selected.transition().attr("r", radius * 2);
-	  enterText(d3.select("#flowertext > h4#h4pmid"), "PMID")
-	  enterText(d3.select("#flowertext > p#pmid"), d.PMID);
-	  enterText(d3.select("#flowertext > h4#h4title"), "Title")
-	  enterText(d3.select("#flowertext > p#title"), d.title);
-	  enterText(d3.select("#flowertext > h4#h4abstract"), "Abstract")		
-	  enterText(d3.select("#flowertext > p#abstract"), d.abstract);
-	  enterText(d3.select("#flowertext > h4#h4pubmedlink"), "PubMed");
-	  d3.select("#flowertext > a#pubmedlink")
-	    .attr("href",pubmed_url_base + d.PMID)
-	    .text("View article");
-	}).on("dblclick",function(d){
-	    //$(window.location.replace("/flower?pmid="+d.PMID));
+  link = svg.selectAll(".link");
+  queries = [jsondata.nodes[0]];
+  node = svg.selectAll(".node");
 
-	  $.get("flower",{pmid: d.PMID},function(newdata) {
-	    console.log("Calling ajax");
-	    queries.push(newdata.nodes[0]);
-	    jsondata.nodes = $.unique(jsondata.nodes.concat(newdata.nodes));
-	    jsondata.links = $.unique(jsondata.links.concat(newdata.links));
-	    link = createLinks(jsondata.links);
-	    node = createNodes(jsondata.nodes,queries);
+  start(jsondata.nodes,jsondata.links);
 
-	  });
-	});
 
+
+};
+
+function createLinks() {
+  link = svg.selectAll(".link");
+  link.data(links)
+      .enter().append("line")
+	     .attr("class", "link")
+	     .style("stroke-width", function(d) { return 4; })
+	     .style("stroke",function(d){return "black"});
+  
+}
+
+function createNodes() {
+
+  node = svg.selectAll(".node")
+  node = node.data(nodes)
+      .enter().append("circle");
+  node.style("stroke-width",1)
+   .attr("class", function(d) { return (
+     queries.map(function(q){return q.PMID}).indexOf(d.PMID) != -1) ? "node query" : "node related" 
+   })
+   .attr("r", function(d) {
+     if (queries.map(function(q){return q.PMID}).indexOf(d.PMID) != -1) { // if it is the query node
+       return radius * 2
+     } else {
+       return radius
+     }
+   })
+   .attr("cx", width / 2).attr("cy", height / 2)
+   .attr("id",function(d){return (queries.map(function(q){return q.PMID}).indexOf(d.PMID) != -1) ? ("query_"+d.PMID) : ("related_"+d.PMID);})
+   .call(force.drag);
+
+  node.on("mouseover",function(d){
+    force.stop();
+    d3.selectAll(".related")
+      .transition()
+      .attr("r",radius);
+
+    selected = d3.select(this);
+    selected.transition().attr("r", radius * 2);
+    enterText(d3.select("#flowertext > h4#h4pmid"), "PMID")
+    enterText(d3.select("#flowertext > p#pmid"), d.PMID);
+    enterText(d3.select("#flowertext > h4#h4title"), "Title")
+    enterText(d3.select("#flowertext > p#title"), d.title);
+    enterText(d3.select("#flowertext > h4#h4abstract"), "Abstract")		
+    enterText(d3.select("#flowertext > p#abstract"), d.abstract);
+    enterText(d3.select("#flowertext > h4#h4pubmedlink"), "PubMed");
+    d3.select("#flowertext > a#pubmedlink")
+      .attr("href",pubmed_url_base + d.PMID)
+      .text("View article");
+  }).on("dblclick",function(d){
+    //$(window.location.replace("/flower?pmid="+d.PMID));
+
+    $.get("flower",{pmid: d.PMID},function(data) {
+      newdata = data;
+      console.log("Calling ajax");
+      newquery = newdata.nodes[0];
+      queries.push(newquery);
+      n = jsondata.nodes.length;
+      newquery_index = jsondata.nodes.map(function(p){return p.PMID}).indexOf(newquery.PMID)
+      console.log(data);
+      newdata.links = newdata.links.map(function(n){
+	n.target = newquery;
+	return n
+      });
+
+      start(newdata.nodes,newdata.links);
+
+
+    });
+  });
+
+
+}
+
+function start(n,l) {
+  // Remove existing force diagram
+  link.remove();
+  node.remove();
+
+  var append_links = new Promise(function(resolve,reject){
+    links = $.unique(links.concat(l));
+    resolve("links appended");
+    reject(Error("failed to create new links"));
+  });
+
+  function append_nodes() {
+    nodes = $.unique(nodes.concat(n));
+    console.log( "nodes appended");
+  }
+
+  function select_links() {
+
+    link = svg.selectAll(".link");
+    console.log( "links selected")
+  }
+  function select_nodes() {
+    node = svg.selectAll(".node");
+    console.log("nodes selected");
+  }
+
+  append_links.then(function(val){
+    console.log(val);
+    createLinks();
+  }).then(function(val){
+    append_nodes();
+  }).then(function(val){
+    createNodes();
+  }).then(function(val){
+    select_links();
+  }).then(function(val){
+    select_nodes();
+  }).then(function(val){
     node.append("title")
 	.text(function(d) { return d.PMID; });
     
     force.on("tick", function() {
-	link.attr("x1", function(d) { return d.source.x; })
-            .attr("y1", function(d) { return d.source.y; })
-            .attr("x2", function(d) { return d.target.x; })
-            .attr("y2", function(d) { return d.target.y; });
-	
-	node
-	    .attr("cx", function(d) { return d.x; })
-            .attr("cy", function(d) { return d.y; })
+      link.attr("x1", function(d) { return d.source.x; })
+          .attr("y1", function(d) { return d.source.y; })
+          .attr("x2", function(d) { return d.target.x; })
+          .attr("y2", function(d) { return d.target.y; });
+      
+      node
+	  .attr("cx", function(d) { return d.x; })
+	  .attr("cy", function(d) { return d.y; })
     });
-};
-
-function createLinks(links) {
-  var l = svg.selectAll(".link")
-     .data(links)
-     .enter().append("line")
-     .attr("class", "link")
-     .style("stroke-width", function(d) { return 4; })
-     .style("stroke",function(d){return "black"});
-  return l
-}
-
-function createNodes(nodes,queries) {
-  var n = svg.selectAll(".node")
-     .data(nodes)
-     .enter().append("circle");
-  n.style("stroke-width",1)
-     .attr("class", function(d) { return (
-       queries.map(function(q){return q.PMID}).indexOf(d.PMID) != -1) ? "node query" : "node related" 
-     })
-	.attr("r", function(d) {
-	    if (queries.map(function(q){return q.PMID}).indexOf(d.PMID) != -1) { // if it is the query node
-		return radius * 2
-	    } else {
-		return radius
-	    }
-	})
-	.attr("cx", width / 2).attr("cy", height / 2)
-	.attr("id",function(d){return (queries.map(function(q){return q.PMID}).indexOf(d.PMID) != -1) ? ("query_"+d.PMID) : ("related_"+d.PMID);})
-	.call(force.drag)
-  return n
+  }).then(function(val){
+    force.nodes(nodes).links(links);
+    console.log(nodes)
+    console.log(links)
+    console.log(node)
+    console.log(link)
+    force.start();
+  });
 }
 
 function enterText(selected, text) {
-    selected
-	.style("color", "white")
-	.transition()
-	.text(text)
-	.style("color", "black")
+  selected
+   .style("color", "white")
+   .transition()
+   .text(text)
+   .style("color", "black")
 }
 
 function exitText(selected) {
-    selected
-	.style("color", "black")
-	.transition()
-	.style("color", "white")
+  selected
+   .style("color", "black")
+   .transition()
+   .style("color", "white")
 }
